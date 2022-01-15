@@ -7,7 +7,8 @@ from time import time
 import numpy as np
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 logging.basicConfig(
@@ -17,6 +18,7 @@ logger = logging.getLogger("api")
 
 app = FastAPI()
 api = FastAPI()
+app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 app.mount("/api", api)
 
 app.add_middleware(
@@ -75,6 +77,11 @@ def encode_image(image_array):
     image.save(output, format="PNG")
     output.seek(0)
     return StreamingResponse(output, media_type="image/png")
+
+
+@app.get("/")
+def home():
+    return RedirectResponse("/static/index.html")
 
 
 @api.get("/image/column/{column}/row/{row}")
