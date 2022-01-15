@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <title>This is the title of the webpage!</title>
+    <meta charset="UTF-8">
+    <script>
+      var connect = function() {
+              var ws = new WebSocket("ws://localhost:8000/ws");
+              ws.onopen = function(data) { console.log("WS opened"); console.log(data); };
+              ws.onclose = function(data) { console.log("WS closed"); console.log(data); };
+              ws.onerror = function(data) { console.log("WS error"); console.log(data); };
+              ws.onmessage = function(event) {
+                      var data = JSON.parse(event.data);
+                      var imgId = `${data.column}/${data.row}`;
+                      console.log(`Setting ${imgId} to ${data.state}`);
+                      var img = document.getElementById(imgId);
+                      img.src = `data:image/png;base64,${data.image}`;
+                    };
+            };
+      connect();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+  </head>
+  <body>
+    <div id="container">
+      {% for row in range(rows) %}
+      <div>
+        {% for column in range(columns) %}
+        <img id="{{column}}/{{row}}" alt="" />
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </body>
+</html>
