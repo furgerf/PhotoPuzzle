@@ -1,9 +1,6 @@
 # Ignoring posgresql.conf copied from ansible
 postgresql.conf
 
-# Ignoring static files from django
-static/
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
