@@ -15,8 +15,8 @@ def main():
 
     print(f"Toggling {args.column}/{args.row}")
     while True:
-        requests.put(f"http://localhost:8000/api/image/column/{args.column}/row/{args.row}/state/toggle")
         sleep(15 * random())
+        requests.put(f"http://localhost:8000/api/image/column/{args.column}/row/{args.row}/state/toggle")
 
 
 if __name__ == "__main__":
