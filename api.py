@@ -5,6 +5,7 @@ import os
 from base64 import b64encode
 from glob import glob
 from time import time
+from websockets.exceptions import ConnectionClosedOK
 
 import numpy as np
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -109,23 +110,30 @@ def get_image_tile(column: int, row: int) -> StreamingResponse:
 async def subscribe(websocket: WebSocket) -> StreamingResponse:
     await websocket.accept()
     logger.info("WS connected")
+    while not image_changes.empty():
+        image_changes.get_nowait()
     for column in range(columns):
         for row in range(rows):
             await image_changes.put((column, row))
-    try:
-        while True:
-            try:
-                column, row = await asyncio.wait_for(image_changes.get(), timeout=2)
-            except asyncio.TimeoutError:
-                # there's nothing to send - check if we're still connected
-                try:
-                    await asyncio.wait_for(websocket.receive_text(), timeout=0.1)
-                    logger.error("Unexpectedly received something on WS")
-                except asyncio.TimeoutError:
-                    pass
-                continue
 
-            logger.info("Updating %d/%d with %d", column, row, image_states[column, row])
+    while True:
+        try:
+            column, row = await asyncio.wait_for(image_changes.get(), timeout=2)
+        except asyncio.TimeoutError:
+            # there's nothing to send - check if we're still connected
+            try:
+                await asyncio.wait_for(websocket.receive_text(), timeout=0.1)
+                logger.error("Unexpectedly received something on WS")
+            except asyncio.TimeoutError:
+                # still connected
+                pass
+            except (WebSocketDisconnect, ConnectionClosedOK):
+                logger.warning("WS disconnected")
+                break
+            continue
+
+        logger.info("Updating %d/%d with %d", column, row, image_states[column, row])
+        try:
             await websocket.send_json(
                 {
                     "column": column,
@@ -134,10 +142,11 @@ async def subscribe(websocket: WebSocket) -> StreamingResponse:
                     "image": b64encode(encode_image(_get_image_tile(column, row)).read()).decode("utf-8"),
                 }
             )
-    except WebSocketDisconnect:
-        logger.warning("WS disconnected")
-        while not image_changes.empty():
-            image_changes.get_nowait()
+        except (WebSocketDisconnect, ConnectionClosedOK):
+            # we probably received an update that's meant for the new connection, re-queue
+            logger.warning("WS disconnected, requeueing %d/%d", column, row)
+            await image_changes.put((column, row))
+            break
 
 
 @api.get("/image/full")
