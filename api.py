@@ -136,6 +136,8 @@ async def subscribe(websocket: WebSocket) -> StreamingResponse:
             )
     except WebSocketDisconnect:
         logger.warning("WS disconnected")
+        while not image_changes.empty():
+            image_changes.get_nowait()
 
 
 @api.get("/image/full")

@@ -5,14 +5,18 @@
     <meta charset="UTF-8">
     <script>
       var connect = function() {
+              console.log("WS connecting");
               var ws = new WebSocket("ws://localhost:8000/ws");
-              ws.onopen = function(data) { console.log("WS opened"); console.log(data); };
-              ws.onclose = function(data) { console.log("WS closed"); console.log(data); };
-              ws.onerror = function(data) { console.log("WS error"); console.log(data); };
+              ws.onopen = function(data) { console.log("WS opened"); };
+              ws.onclose = async function(data) {
+                      console.log("WS closed");
+                      await new Promise(r => setTimeout(r, 1000));
+                      connect();
+                    };
+              ws.onerror = function(data) { console.log("WS error"); };
               ws.onmessage = function(event) {
                       var data = JSON.parse(event.data);
                       var imgId = `${data.column}/${data.row}`;
-                      console.log(`Setting ${imgId} to ${data.state}`);
                       var img = document.getElementById(imgId);
                       img.src = `data:image/png;base64,${data.image}`;
                     };
