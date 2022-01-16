@@ -13,9 +13,9 @@ def main():
     parser.add_argument("--row", type=int)
     args = parser.parse_args()
 
+    print(f"Toggling {args.column}/{args.row}")
     while True:
-        print(f"Toggling {args.column}/{args.row}")
-        requests.get(f"http://localhost:8000/api/image/column/{args.column}/row/{args.row}/state/toggle")
+        requests.put(f"http://localhost:8000/api/image/column/{args.column}/row/{args.row}/state/toggle")
         sleep(15 * random())
 
 

@@ -92,12 +92,12 @@ def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "columns": columns, "rows": rows})
 
 
-@api.get("/image/column/{column}/row/{row}/state/toggle")
-async def toggle_image_tile(column: int, row: int) -> str:
+@api.put("/image/column/{column}/row/{row}/state/toggle")
+async def toggle_image_tile(column: int, row: int) -> int:
     image_states[column, row] = (image_states[column, row] + 1) % len(images)
     await image_changes.put((column, row))
     logger.info("Set %d/%d to %d", column, row, image_states[column, row])
-    return "ok"
+    return image_states[column, row].item()
 
 
 @api.get("/image/column/{column}/row/{row}")
