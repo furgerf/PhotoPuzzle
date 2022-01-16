@@ -7,7 +7,7 @@ from glob import glob
 from time import time
 
 import numpy as np
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -108,20 +108,34 @@ def get_image_tile(column: int, row: int) -> StreamingResponse:
 @app.websocket("/ws")
 async def subscribe(websocket: WebSocket) -> StreamingResponse:
     await websocket.accept()
+    logger.info("WS connected")
     for column in range(columns):
         for row in range(rows):
             await image_changes.put((column, row))
-    while True:
-        column, row = await image_changes.get()
-        logger.info("Updating %d/%d with %d", column, row, image_states[column, row])
-        await websocket.send_json(
-            {
-                "column": column,
-                "row": row,
-                "state": image_states[column, row].item(),
-                "image": b64encode(encode_image(_get_image_tile(column, row)).read()).decode("utf-8"),
-            }
-        )
+    try:
+        while True:
+            try:
+                column, row = await asyncio.wait_for(image_changes.get(), timeout=2)
+            except asyncio.TimeoutError:
+                # there's nothing to send - check if we're still connected
+                try:
+                    await asyncio.wait_for(websocket.receive_text(), timeout=0.1)
+                    logger.error("Unexpectedly received something on WS")
+                except asyncio.TimeoutError:
+                    pass
+                continue
+
+            logger.info("Updating %d/%d with %d", column, row, image_states[column, row])
+            await websocket.send_json(
+                {
+                    "column": column,
+                    "row": row,
+                    "state": image_states[column, row].item(),
+                    "image": b64encode(encode_image(_get_image_tile(column, row)).read()).decode("utf-8"),
+                }
+            )
+    except WebSocketDisconnect:
+        logger.warning("WS disconnected")
 
 
 @api.get("/image/full")
