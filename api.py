@@ -43,7 +43,7 @@ async def log_process_time(request: Request, call_next):
 resize = int(os.environ["RESIZE"])
 
 images = []
-for image_file in glob(os.path.join("data", "*.png")):
+for image_file in glob(os.path.join("data", "*")):
     logger.info("Loading %s", image_file)
     with Image.open(image_file) as img:
         new_size = (img.size[0] // resize, img.size[1] // resize)
@@ -107,7 +107,7 @@ def get_image_tile(column: int, row: int) -> StreamingResponse:
 
 
 @app.websocket("/ws")
-async def subscribe(websocket: WebSocket) -> StreamingResponse:
+async def subscribe(websocket: WebSocket) -> None:
     await websocket.accept()
     logger.info("WS connected")
     while not image_changes.empty():
