@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <title>PhotoPuzzle</title>
+    <meta charset="UTF-8">
+    <script>
+      var tile = undefined;
+      fetch("/api/tile-assignment")
+        .then(response => response.json())
+        .then(data => {
+                console.log(`Received tile ${JSON.stringify(data)}`)
+                tile = data;
+              });
+      var toggle = function() {
+              if (tile === undefined) {
+                console.log("No tile assigned yet");
+              } else {
+                fetch(`/api/image/column/${tile.column}/row/${tile.row}/state/toggle`, {method: "PUT"});
+              }
+            };
+    </script>
+  </head>
+  <body>
+    <img id="button" alt="Red button" onclick="toggle();" src="{{ url_for('static', path='/button.jpg') }}" />
+  </body>
+</html>

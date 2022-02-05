@@ -54,6 +54,7 @@ for image_file in glob(os.path.join("data", "*")):
 columns = int(os.environ["COLUMNS"])
 rows = int(os.environ["ROWS"])
 image_states = np.random.randint(len(images), size=(columns, rows)).astype(np.uint8)
+tile_assignments = np.ones_like(image_states).astype(bool)
 image_changes = asyncio.Queue()
 
 
@@ -91,6 +92,19 @@ def image_response(output):
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "columns": columns, "rows": rows})
+
+
+@app.get("/client", response_class=HTMLResponse)
+def client(request: Request):
+    return templates.TemplateResponse("client.html", {"request": request, "columns": columns, "rows": rows})
+
+
+@api.get("/tile-assignment")
+def get_tile_assignment(_: Request) -> dict:
+    available_tiles = np.stack(np.where(tile_assignments))
+    tile = available_tiles[:, np.random.randint(available_tiles.shape[1])].tolist()
+    tile_assignments[tuple(tile)] = False
+    return {"column": tile[0], "row": tile[1]}
 
 
 @api.put("/image/column/{column}/row/{row}/state/toggle")
