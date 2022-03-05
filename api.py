@@ -46,7 +46,7 @@ async def log_process_time(request: Request, call_next):
 resize = int(os.environ["RESIZE"])
 
 images = []
-for image_file in glob(os.path.join("data", "*")):
+for image_file in sorted(glob(os.path.join("data", "*"))):
     logger.info("Loading %s", image_file)
     with Image.open(image_file) as img:
         new_size = (img.size[0] // resize, img.size[1] // resize)
@@ -63,7 +63,13 @@ image_states = np.random.randint(len(images), size=(columns, rows)).astype(np.ui
 tile_assignments = np.ones_like(image_states).astype(bool)
 image_changes = asyncio.Queue()
 
-inertia = 10
+initial_inertia = 30
+target_inertia = 25
+inertia_step = -0.2
+multiplier_correct = 0.5
+multiplier_wrong = 0.2
+
+inertia = initial_inertia
 loop = asyncio.get_event_loop()
 
 
@@ -72,30 +78,33 @@ def run_fake_user(column, row):
         logger.info("%d/%d has been taken over by a user", column, row)
         return
 
-    def handle_toggle(task):
+    if image_states[column, row] == target and inertia <= target_inertia:
+        logger.info("%d/%d has been completed", column, row)
+        return
+
+    def delay_next_toggle(task):
         state = task.result()
-        if state == target and inertia > 30:
-            logger.info("%d/%d has been completed", column, row)
-            return
+        multiplier = multiplier_correct if state == target else multiplier_wrong
+        loop.call_later(random() * multiplier * max(inertia, 1), run_fake_user, column, row)
 
-        multiplier = 6 if state == target else 0.5
-        loop.call_later(inertia * multiplier * random(), run_fake_user, column, row)
-
-    loop.create_task(toggle_image_tile(column, row)).add_done_callback(handle_toggle)
+    loop.create_task(toggle_image_tile(column, row)).add_done_callback(delay_next_toggle)
 
 
 for column in range(columns):
     for row in range(rows):
-        loop.call_later(1 + 10 * random(), run_fake_user, column, row)
+        loop.call_later(10 * random(), run_fake_user, column, row)
 
 
-def increase_inertia():
+def reduce_inertia():
     global inertia
-    inertia += 1
-    loop.call_later(1, increase_inertia)
+    if inertia == target_inertia:
+        logger.info("Inertia has reached %d", target_inertia)
+        return
+    inertia += inertia_step
+    loop.call_later(1, reduce_inertia)
 
 
-increase_inertia()
+reduce_inertia()
 
 
 def _get_image_tile(column: int, row: int):
