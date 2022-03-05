@@ -4,8 +4,9 @@ import logging
 import os
 from base64 import b64encode
 from glob import glob
-from time import time
-from websockets.exceptions import ConnectionClosedOK
+from random import random
+from threading import Thread
+from time import sleep, time
 
 import numpy as np
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -14,6 +15,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from PIL import Image
+from websockets.exceptions import ConnectionClosedOK
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(funcName)s:%(lineno)d: %(message)s"
@@ -53,9 +55,46 @@ for image_file in glob(os.path.join("data", "*")):
 
 columns = int(os.environ["COLUMNS"])
 rows = int(os.environ["ROWS"])
+target = int(os.environ["TARGET"])
+if target < 0:
+    target = np.random.randint(len(images))
 image_states = np.random.randint(len(images), size=(columns, rows)).astype(np.uint8)
 tile_assignments = np.ones_like(image_states).astype(bool)
 image_changes = asyncio.Queue()
+
+inertia = 10
+loop = asyncio.get_event_loop()
+
+
+def run_fake_user(column, row):
+    if not tile_assignments[column, row]:
+        logger.info("%d/%d has been taken over by a user", column, row)
+        return
+
+    def handle_toggle(task):
+        state = task.result()
+        if state == target and inertia > 30:
+            logger.info("%d/%d has been completed", column, row)
+            return
+
+        multiplier = 6 if state == target else 0.5
+        loop.call_later(inertia * multiplier * random(), run_fake_user, column, row)
+
+    loop.create_task(toggle_image_tile(column, row)).add_done_callback(handle_toggle)
+
+
+for column in range(columns):
+    for row in range(rows):
+        loop.call_later(1 + 10 * random(), run_fake_user, column, row)
+
+
+def increase_inertia():
+    global inertia
+    inertia += 1
+    loop.call_later(1, increase_inertia)
+
+
+increase_inertia()
 
 
 def _get_image_tile(column: int, row: int):
@@ -104,6 +143,7 @@ def get_tile_assignment(_: Request) -> dict:
     available_tiles = np.stack(np.where(tile_assignments))
     tile = available_tiles[:, np.random.randint(available_tiles.shape[1])].tolist()
     tile_assignments[tuple(tile)] = False
+    logger.info("Assigned %d/%d to (human) client", tile[0], tile[1])
     return {"column": tile[0], "row": tile[1]}
 
 
@@ -146,7 +186,7 @@ async def subscribe(websocket: WebSocket) -> None:
                 break
             continue
 
-        logger.info("Updating %d/%d with %d", column, row, image_states[column, row])
+        logger.debug("Updating %d/%d with %d", column, row, image_states[column, row])
         try:
             await websocket.send_json(
                 {
