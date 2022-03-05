@@ -84,9 +84,9 @@ def run_fake_user(column, row):
     loop.create_task(toggle_image_tile(column, row)).add_done_callback(handle_toggle)
 
 
-# for column in range(columns):
-#     for row in range(rows):
-#         loop.call_later(1 + 10 * random(), run_fake_user, column, row)
+for column in range(columns):
+    for row in range(rows):
+        loop.call_later(1 + 10 * random(), run_fake_user, column, row)
 
 
 def increase_inertia():
@@ -153,6 +153,12 @@ def _get_tile_assignment() -> Tuple[int, int]:
     return tile
 
 
+def _free_tile_assignment(column: int, row: int) -> None:
+    tile_assignments[column, row] = True
+    loop.call_later(1 + 10 * random(), run_fake_user, column, row)
+    logger.info("Replaced %d/%d with bot", column, row)
+
+
 @api.put("/image/column/{column}/row/{row}/state/toggle")
 async def toggle_image_tile(column: int, row: int) -> int:
     image_states[column, row] = (image_states[column, row] + 1) % len(images)
@@ -215,19 +221,20 @@ async def subscribe_client(websocket: WebSocket) -> None:
     logger.info("WS-client connected")
     column, row = _get_tile_assignment()
 
-    while True:
-        try:
+    try:
+        while True:
             command = await websocket.receive_text()
             if command == "toggle":
                 await toggle_image_tile(column, row)
             elif command == "change-tile":
                 logger.info("Client requested new tile")
+                _free_tile_assignment(column, row)
                 column, row = _get_tile_assignment()
             else:
                 logger.warning("Received unknown command %s", command)
-        except (WebSocketDisconnect, ConnectionClosedOK):
-            logger.warning("WS disconnected")
-            break
+    except (WebSocketDisconnect, ConnectionClosedOK):
+        logger.warning("WS disconnected")
+        _free_tile_assignment(column, row)
 
 
 @api.get("/image/full")
