@@ -7,6 +7,7 @@ from glob import glob
 from random import random
 from threading import Thread
 from time import sleep, time
+from typing import Optional, Tuple
 
 import numpy as np
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -83,9 +84,9 @@ def run_fake_user(column, row):
     loop.create_task(toggle_image_tile(column, row)).add_done_callback(handle_toggle)
 
 
-for column in range(columns):
-    for row in range(rows):
-        loop.call_later(1 + 10 * random(), run_fake_user, column, row)
+# for column in range(columns):
+#     for row in range(rows):
+#         loop.call_later(1 + 10 * random(), run_fake_user, column, row)
 
 
 def increase_inertia():
@@ -140,11 +141,16 @@ def client(request: Request):
 
 @api.get("/tile-assignment")
 def get_tile_assignment(_: Request) -> dict:
+    tile = _get_tile_assignment()
+    return {"column": tile[0], "row": tile[1]}
+
+
+def _get_tile_assignment() -> Tuple[int, int]:
     available_tiles = np.stack(np.where(tile_assignments))
     tile = available_tiles[:, np.random.randint(available_tiles.shape[1])].tolist()
     tile_assignments[tuple(tile)] = False
     logger.info("Assigned %d/%d to (human) client", tile[0], tile[1])
-    return {"column": tile[0], "row": tile[1]}
+    return tile
 
 
 @api.put("/image/column/{column}/row/{row}/state/toggle")
@@ -200,6 +206,27 @@ async def subscribe(websocket: WebSocket) -> None:
             # we probably received an update that's meant for the new connection, re-queue
             logger.warning("WS disconnected, requeueing %d/%d", column, row)
             await image_changes.put((column, row))
+            break
+
+
+@app.websocket("/ws-client")
+async def subscribe_client(websocket: WebSocket) -> None:
+    await websocket.accept()
+    logger.info("WS-client connected")
+    column, row = _get_tile_assignment()
+
+    while True:
+        try:
+            command = await websocket.receive_text()
+            if command == "toggle":
+                await toggle_image_tile(column, row)
+            elif command == "change-tile":
+                logger.info("Client requested new tile")
+                column, row = _get_tile_assignment()
+            else:
+                logger.warning("Received unknown command %s", command)
+        except (WebSocketDisconnect, ConnectionClosedOK):
+            logger.warning("WS disconnected")
             break
 
 

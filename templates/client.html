@@ -4,23 +4,44 @@
     <title>PhotoPuzzle</title>
     <meta charset="UTF-8">
     <script>
-      var tile = undefined;
-      fetch("/api/tile-assignment")
-        .then(response => response.json())
-        .then(data => {
-                console.log(`Received tile ${JSON.stringify(data)}`)
-                tile = data;
-              });
+      var ws = null;
+      var connected = false;
       var toggle = function() {
-              if (tile === undefined) {
-                console.log("No tile assigned yet");
+              if (!connected) {
+                console.log("Currently not connected");
               } else {
-                fetch(`/api/image/column/${tile.column}/row/${tile.row}/state/toggle`, {method: "PUT"});
+                ws.send("toggle");
               }
             };
+      var changeTile = function() {
+              if (!connected) {
+                console.log("Currently not connected");
+              } else {
+                ws.send("change-tile");
+              }
+            };
+      var connect = function() {
+              console.log("WS connecting");
+              ws = new WebSocket("ws://localhost:8000/ws-client");
+              ws.onopen = function(data) {
+                      console.log("WS opened");
+                      connected = true;
+                    };
+              ws.onclose = async function(data) {
+                      console.log("WS closed");
+                      connected = false;
+                      await new Promise(r => setTimeout(r, 1000));
+                      connect();
+                    };
+              ws.onerror = function(data) { console.log("WS error"); };
+              ws.onmessage = function(event) { console.log("WS message: " + event); };
+            };
+      connect();
     </script>
   </head>
   <body>
-    <img id="button" alt="Red button" onclick="toggle();" src="{{ url_for('static', path='/button.jpg') }}" />
+    <img alt="Red button" onclick="toggle();" src="{{ url_for('static', path='/button-red.jpg') }}" />
+    <img alt="Blue button" onclick="changeTile();" src="{{ url_for('static', path='/button-blue.jpg') }}" />
+    <img alt="Green button" onclick="" src="{{ url_for('static', path='/button-green.jpg') }}" />
   </body>
 </html>
