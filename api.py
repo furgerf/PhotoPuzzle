@@ -5,9 +5,8 @@ import os
 from base64 import b64encode
 from glob import glob
 from random import random
-from threading import Thread
-from time import sleep, time
-from typing import Optional, Tuple
+from time import time
+from typing import Tuple
 
 import numpy as np
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -57,6 +56,8 @@ for image_file in sorted(glob(os.path.join("data", "*"))):
 columns = int(os.environ["COLUMNS"])
 rows = int(os.environ["ROWS"])
 target = int(os.environ["TARGET"])
+use_bots = bool(os.environ["BOTS"])
+logger.info("Using bots: %s", use_bots)
 if target < 0:
     target = np.random.randint(len(images))
 image_states = np.random.randint(len(images), size=(columns, rows)).astype(np.uint8)
@@ -85,14 +86,15 @@ def run_fake_user(column, row):
     def delay_next_toggle(task):
         state = task.result()
         multiplier = multiplier_correct if state == target else multiplier_wrong
-        loop.call_later(random() * multiplier * max(inertia, 1), run_fake_user, column, row)
+        loop.call_later(10 * random() * multiplier * max(inertia, 1), run_fake_user, column, row)
 
     loop.create_task(toggle_image_tile(column, row)).add_done_callback(delay_next_toggle)
 
 
-for column in range(columns):
-    for row in range(rows):
-        loop.call_later(10 * random(), run_fake_user, column, row)
+if use_bots:
+    for column in range(columns):
+        for row in range(rows):
+            loop.call_later(10 * random(), run_fake_user, column, row)
 
 
 def reduce_inertia():
