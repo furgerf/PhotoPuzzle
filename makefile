@@ -4,7 +4,7 @@ VENV=venv
 .PHONY: run stop freeze build install uninstall
 
 run:
-	@docker-compose up --remove-orphans
+	@DATA_DIR=$(DATA_DIR) docker-compose up --remove-orphans
 
 stop:
 	@docker-compose down --remove-orphans

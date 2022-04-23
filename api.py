@@ -45,7 +45,8 @@ async def log_process_time(request: Request, call_next):
 resize = int(os.environ["RESIZE"])
 
 images = []
-for image_file in sorted(glob(os.path.join("data", "*"))):
+data_dir = os.environ["DATA_DIR"]
+for image_file in sorted(glob(os.path.join(data_dir, "*"))):
     logger.info("Loading %s", image_file)
     with Image.open(image_file) as img:
         new_size = (img.size[0] // resize, img.size[1] // resize)
