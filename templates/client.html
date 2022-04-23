@@ -4,44 +4,35 @@
     <title>PhotoPuzzle</title>
     <meta charset="UTF-8">
     <script>
-      var ws = null;
-      var connected = false;
+      var item = localStorage.getItem("tile");
+      var tile = JSON.parse(item);
+      console.log(`Loaded tile ${JSON.stringify(tile)}`);
       var toggle = function() {
-              if (!connected) {
-                console.log("Currently not connected");
-              } else {
-                ws.send("toggle");
-              }
-            };
+        if (tile === undefined) {
+          console.log("No tile assigned yet");
+        } else {
+          fetch(`/api/image/column/${tile.column}/row/${tile.row}/state/toggle`, {method: "PUT"});
+        }
+      };
       var changeTile = function() {
-              if (!connected) {
-                console.log("Currently not connected");
-              } else {
-                ws.send("change-tile");
-              }
-            };
-      var connect = function() {
-              console.log("WS connecting");
-              ws = new WebSocket("ws://localhost:8000/ws-client");
-              ws.onopen = function(data) {
-                      console.log("WS opened");
-                      connected = true;
-                    };
-              ws.onclose = async function(data) {
-                      console.log("WS closed");
-                      connected = false;
-                      await new Promise(r => setTimeout(r, 1000));
-                      connect();
-                    };
-              ws.onerror = function(data) { console.log("WS error"); };
-              ws.onmessage = function(event) { console.log("WS message: " + event); };
-            };
-      connect();
+        fetch("/api/tile-assignment", {
+                method: "POST",
+                headers: {"Accept": "application/json", "Content-Type": "application/json"},
+                body: JSON.stringify({currentTile: tile})
+              })
+          .then(response => response.json())
+          .then(data => {
+            console.log(`Received tile ${JSON.stringify(data)}`)
+            tile = data;
+            localStorage.setItem("tile", JSON.stringify(tile));
+          });
+      };
+      changeTile();
     </script>
   </head>
   <body>
     <img alt="Red button" onclick="toggle();" src="{{ url_for('static', path='/button-red.jpg') }}" />
     <img alt="Blue button" onclick="changeTile();" src="{{ url_for('static', path='/button-blue.jpg') }}" />
-    <img alt="Green button" onclick="" src="{{ url_for('static', path='/button-green.jpg') }}" />
+    <!-- <img alt="Green button" onclick="" src="{{ url_for('static', path='/button-green.jpg') }}" /> -->
   </body>
 </html>

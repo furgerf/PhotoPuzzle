@@ -150,9 +150,13 @@ def client(request: Request):
     return templates.TemplateResponse("client.html", {"request": request, "columns": columns, "rows": rows})
 
 
-@api.get("/tile-assignment")
-def get_tile_assignment(_: Request) -> dict:
+@api.post("/tile-assignment")
+def get_tile_assignment(_: Request, body: dict) -> dict:
     tile = _get_tile_assignment()
+    current_tile = body.get("currentTile")
+    if current_tile:
+        _free_tile_assignment(current_tile["column"], current_tile["row"])
+
     return {"column": tile[0], "row": tile[1]}
 
 
@@ -165,9 +169,11 @@ def _get_tile_assignment() -> Tuple[int, int]:
 
 
 def _free_tile_assignment(column: int, row: int) -> None:
+    was_assigned = tile_assignments[column, row]
     tile_assignments[column, row] = True
-    loop.call_later(1 + 10 * random(), run_fake_user, column, row)
-    logger.info("Replaced %d/%d with bot", column, row)
+    if use_bots and was_assigned:
+        loop.call_later(1 + 10 * random(), run_fake_user, column, row)
+        logger.info("Replaced %d/%d with bot", column, row)
 
 
 @api.put("/image/column/{column}/row/{row}/state/toggle")
