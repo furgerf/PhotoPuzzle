@@ -28,11 +28,20 @@
           });
       };
       changeTile();
+      var toggleOpacity = function(id) {
+        var element = document.getElementById(id);
+        element.style.opacity = 0.6;
+        element.style.filter ="alpha(opacity=60)"; // IE fallback
+        setTimeout(function () {
+          element.style.opacity = 1.0;
+          element.style.filter ="alpha(opacity=100)"; // IE fallback
+        }, 100);
+      };
     </script>
   </head>
   <body>
-    <img alt="Red button" onclick="toggle();" src="{{ url_for('static', path='/button-red.jpg') }}" />
-    <img alt="Blue button" onclick="changeTile();" src="{{ url_for('static', path='/button-blue.jpg') }}" />
-    <!-- <img alt="Green button" onclick="" src="{{ url_for('static', path='/button-green.jpg') }}" /> -->
+    <img id="button-red" alt="Red button" onclick="toggleOpacity('button-red'); toggle();" src="{{ url_for('static', path='/button-red.jpg') }}" />
+    <img id="button-blue" alt="Blue button" onclick="toggleOpacity('button-blue'); changeTile();" src="{{ url_for('static', path='/button-blue.jpg') }}" />
+    <!-- <img id="button-blue" alt="Green button" onclick="" src="{{ url_for('static', path='/button-green.jpg') }}" /> -->
   </body>
 </html>
