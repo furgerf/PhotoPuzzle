@@ -7,6 +7,8 @@ from glob import glob
 from random import random
 from time import time
 from typing import Tuple
+from uuid import UUID, uuid4
+from fastapi.exceptions import HTTPException
 
 import numpy as np
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -58,12 +60,13 @@ columns = int(os.environ["COLUMNS"])
 rows = int(os.environ["ROWS"])
 target = int(os.environ["TARGET"])
 use_bots = bool(os.environ["BOTS"])
-logger.info("Using bots: %s", use_bots)
 if target < 0:
     target = np.random.randint(len(images))
 image_states = np.random.randint(len(images), size=(columns, rows)).astype(np.uint8)
 tile_assignments = np.ones_like(image_states).astype(bool)
 image_changes = asyncio.Queue()
+current_run_id = uuid4()
+logger.info("Starting run %s with bots: %s", current_run_id, use_bots)
 
 initial_inertia = 30
 target_inertia = 25
@@ -155,10 +158,10 @@ def client(request: Request):
 def get_tile_assignment(_: Request, body: dict) -> dict:
     tile = _get_tile_assignment()
     current_tile = body.get("currentTile")
-    if current_tile:
+    if current_tile and current_tile.get("run_id") == current_run_id:
         _free_tile_assignment(current_tile["column"], current_tile["row"])
 
-    return {"column": tile[0], "row": tile[1]}
+    return {"column": tile[0], "row": tile[1], "run_id": current_run_id}
 
 
 def _get_tile_assignment() -> Tuple[int, int]:
@@ -177,8 +180,11 @@ def _free_tile_assignment(column: int, row: int) -> None:
         logger.info("Replaced %d/%d with bot", column, row)
 
 
-@api.put("/image/column/{column}/row/{row}/state/toggle")
-async def toggle_image_tile(column: int, row: int) -> int:
+@api.put("/image/{run_id}/column/{column}/row/{row}/state/toggle")
+async def toggle_image_tile(run_id: UUID, column: int, row: int) -> int:
+    if run_id != current_run_id:
+        raise HTTPException(status_code=400, detail="Invalid run ID")
+
     image_states[column, row] = (image_states[column, row] + 1) % len(images)
     await image_changes.put((column, row))
     logger.info("Set %d/%d to %d", column, row, image_states[column, row])

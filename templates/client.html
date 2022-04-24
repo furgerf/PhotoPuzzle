@@ -4,18 +4,24 @@
     <title>PhotoPuzzle</title>
     <meta charset="UTF-8">
     <script>
-      var item = localStorage.getItem("tile");
-      var tile = JSON.parse(item);
+      var tile = JSON.parse(localStorage.getItem("tile"));
       console.log(`Loaded tile ${JSON.stringify(tile)}`);
       var toggle = function() {
         if (tile === undefined) {
           console.log("No tile assigned yet");
         } else {
-          fetch(`/api/image/column/${tile.column}/row/${tile.row}/state/toggle`, {method: "PUT"});
+          fetch(`/api/image/${tile.run_id}/column/${tile.column}/row/${tile.row}/state/toggle`, {method: "PUT"})
+            .then(response => {
+              if (response.status === 400) {
+                console.log("Refreshing tile");
+                tile = undefined;
+                changeTile().then(toggle);
+              }
+            });
         }
       };
       var changeTile = function() {
-        fetch("/api/tile-assignment", {
+        return fetch("/api/tile-assignment", {
                 method: "POST",
                 headers: {"Accept": "application/json", "Content-Type": "application/json"},
                 body: JSON.stringify({currentTile: tile})
