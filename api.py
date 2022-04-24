@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from PIL import Image
+from starlette.responses import FileResponse
 from websockets.exceptions import ConnectionClosedOK
 
 logging.basicConfig(
@@ -152,6 +153,11 @@ def home(request: Request):
 @app.get("/client", response_class=HTMLResponse)
 def client(request: Request):
     return templates.TemplateResponse("client.html", {"request": request, "columns": columns, "rows": rows})
+
+
+@app.get("/favicon.ico")
+def favicon(request: Request):
+    return FileResponse("static/favicon.ico")
 
 
 @api.post("/tile-assignment")
